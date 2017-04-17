@@ -1,0 +1,2 @@
+This is a test document for training an RNN.
+I want to make sure it is longer than 100 characters so that it doesn't get messed up with a timestep of 100. No real training data would have that little data.

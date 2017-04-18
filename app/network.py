@@ -1,7 +1,9 @@
 import tensorflow as tf
 import numpy as np
+from time_helper import TimeHelper
 import random
 import os.path
+import time
 
 CHECKPOINT_DIR = 'saved/'
 
@@ -10,6 +12,7 @@ class Network:
   def __init__(self, data, lstm_size=128, num_layers=2, learning_rate=0.003, name="rnn", ckpt_file='model.ckpt'):
     self.scope = name
     self.sess = None
+    self.saver = None
 
     self.data = data
     self.in_size = self.out_size = len(self.data.get_vocab())
@@ -23,7 +26,6 @@ class Network:
     self.lstm_last_state = np.zeros((self.num_layers*2*self.lstm_size,))
 
     with tf.variable_scope(self.scope):
-      ## (batch_size, timesteps, in_size)
       self.x_input = tf.placeholder(tf.float32, shape=(None, None, self.in_size), name="x_input")
       self.lstm_init_value = tf.placeholder(tf.float32, shape=(None, self.num_layers*2*self.lstm_size), name="lstm_init_value")
 
@@ -53,25 +55,29 @@ class Network:
       self.train_op = tf.train.RMSPropOptimizer(self.learning_rate, 0.9).minimize(self.cost)
 
   def get_tensorflow_session(self):
-    if self.sess:
-      return self.sess
-    else:
+    if not self.sess:
       self.sess = self.sess or tf.InteractiveSession()
       self.sess.run(tf.global_variables_initializer())
 
     return self.sess
 
   def get_saver(self):
-    self.saver = tf.train.Saver(tf.global_variables())
+    if not self.saver:
+      self.saver = tf.train.Saver(tf.global_variables())
     return self.saver
 
   def restore_network(self):
+    self.get_saver()
     if os.path.isfile(self.ckpt_file + '.index'):
       self.saver.restore(self.sess, self.ckpt_file)
 
   def train_batch(self, batch_size, num_batches, time_steps):
     self.get_tensorflow_session()
     self.restore_network();
+
+    th = TimeHelper()
+
+    th.get_current_time_ms()
 
     batch = np.zeros((batch_size, time_steps, self.in_size))
     batch_y = np.zeros((batch_size, time_steps, self.in_size))
@@ -93,12 +99,18 @@ class Network:
       cost, _ = self.sess.run([self.cost, self.train_op], feed_dict={self.x_input:batch, self.y_batch:batch_y, self.lstm_init_value:init_value})
 
       if (i + 1) % 100 == 0 and i != 0:
-        print "batch: %s, loss: %s" % (i+1, cost)
+        new_time_ms = th.get_current_time_ms()
+        time_between_batches_ms = th.diff_ms(new_time_ms);
+        batches_per_second = round(100/th.ms_to_s(time_between_batches_ms), 3)
+        batches_left = num_batches - i
+        etl =  th.s_format(round(batches_left / batches_per_second, 3))
+
+        print "batch: %s, loss: %s; batches per second: %s; estimated time left: %s" % (i+1, cost, batches_per_second, etl)
 
       if (i + 1) % 1000 == 0 and i != 0:
         print self.get_sentence()
+        self.saver.save(self.sess, self.ckpt_file)
 
-    saver.save(self.sess, self.ckpt_file)
 
   def get_sentence(self, start_string="the", ending_values=['.', '?', '!']):
     self.get_tensorflow_session()

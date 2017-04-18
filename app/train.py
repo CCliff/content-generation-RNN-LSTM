@@ -3,10 +3,10 @@ from data_handler import DataHandler
 from network import Network
 
 LSTM_SIZE = 128
-NUM_LAYERS = 2
+NUM_LAYERS = 3
 LEARNING_RATE = 0.003
 NAME = 'lstm_rnn'
-BATCH_SIZE = 50
+BATCH_SIZE = 128
 TIME_STEPS = 100
 NUM_TRAIN_BATCHES = 2000
 
@@ -44,3 +44,5 @@ if command == '--train':
   train()
 elif command == '--sample':
   get_sentence()
+else:
+  print "Unknown command: either --train or --sample required"

@@ -9,7 +9,7 @@ CHECKPOINT_DIR = 'saved/'
 
 class Network:
 
-  def __init__(self, data, lstm_size=128, num_layers=2, learning_rate=0.003, name="rnn", ckpt_file='model.ckpt'):
+  def __init__(self, data, lstm_size=128, num_layers=2, learning_rate=0.003, lr_decay=0.9, momentum=0.0, epsilon=1e-10, forget_bias=1.0, std_dev_init=0.01, name="rnn", ckpt_file='model.ckpt'):
     self.scope = name
     self.sess = None
     self.saver = None
@@ -30,15 +30,15 @@ class Network:
       self.lstm_init_value = tf.placeholder(tf.float32, shape=(None, self.num_layers*2*self.lstm_size), name="lstm_init_value")
 
       # LSTM
-      lstm_cells = [ tf.contrib.rnn.BasicLSTMCell(self.lstm_size, forget_bias=1.0, state_is_tuple=False) for i in range(self.num_layers)]
-      lstm = tf.contrib.rnn.MultiRNNCell(lstm_cells, state_is_tuple=False)
+      lstm_cell = tf.contrib.rnn.BasicLSTMCell(self.lstm_size, forget_bias=forget_bias, state_is_tuple=False)
+      lstm = tf.contrib.rnn.MultiRNNCell([lstm_cell] * self.num_layers, state_is_tuple=False)
 
       # Iteratively compute output of recurrent network
       outputs, self.lstm_new_state = tf.nn.dynamic_rnn(lstm, self.x_input, initial_state=self.lstm_init_value, dtype=tf.float32)
 
       # Linear activation (FC layer on top of the LSTM net)
-      rnn_out_W = tf.Variable(tf.random_normal( (self.lstm_size, self.out_size), stddev=0.01 ))
-      rnn_out_B = tf.Variable(tf.random_normal( (self.out_size, ), stddev=0.01 ))
+      rnn_out_W = tf.Variable(tf.random_normal( (self.lstm_size, self.out_size), stddev=std_dev_init ))
+      rnn_out_B = tf.Variable(tf.random_normal( (self.out_size, ), stddev=std_dev_init ))
 
       outputs_reshaped = tf.reshape( outputs, [-1, self.lstm_size] )
       network_output = ( tf.matmul( outputs_reshaped, rnn_out_W ) + rnn_out_B )
@@ -52,7 +52,8 @@ class Network:
       y_batch_long = tf.reshape(self.y_batch, [-1, self.out_size])
 
       self.cost = tf.reduce_mean( tf.nn.softmax_cross_entropy_with_logits(logits=network_output, labels=y_batch_long) )
-      self.train_op = tf.train.RMSPropOptimizer(self.learning_rate, 0.9).minimize(self.cost)
+      self.train_op = tf.train.AdamOptimizer(learning_rate=self.learning_rate, beta1=0.99, epsilon=epsilon).minimize(self.cost)
+      # self.train_op = tf.train.RMSPropOptimizer(self.learning_rate, decay=lr_decay, momentum=momentum, epsilon=epsilon).minimize(self.cost)
 
   def get_tensorflow_session(self):
     if not self.sess:
@@ -108,9 +109,8 @@ class Network:
         print "batch: %s, loss: %s; batches per second: %s; estimated time left: %s" % (i+1, cost, batches_per_second, etl)
 
       if (i + 1) % 1000 == 0 and i != 0:
-        print self.get_sentence()
         self.saver.save(self.sess, self.ckpt_file)
-
+        print self.get_sentence()
 
   def get_sentence(self, start_string="the", ending_values=['.', '?', '!']):
     self.get_tensorflow_session()

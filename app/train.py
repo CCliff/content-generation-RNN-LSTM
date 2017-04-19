@@ -3,12 +3,18 @@ from data_handler import DataHandler
 from network import Network
 
 LSTM_SIZE = 128
-NUM_LAYERS = 3
+NUM_LAYERS = 4
 LEARNING_RATE = 0.003
 NAME = 'lstm_rnn'
 BATCH_SIZE = 128
-TIME_STEPS = 100
-NUM_TRAIN_BATCHES = 2000
+TIME_STEPS = 50
+NUM_TRAIN_BATCHES = 20000
+
+OPT_DECAY = 0.99
+OPT_MOMENTUM = 0.25
+OPT_EPSILON = 1e-10
+OPT_FORGET_BIAS = 5.0
+OPT_STDDEV = 0.01
 
 text_file = ''
 ckpt_file = ''
@@ -19,7 +25,7 @@ def prepare_network():
   data = DataHandler(text_file)
   data.prepare_for_training()
   # Create a network
-  return  Network(data, LSTM_SIZE, NUM_LAYERS, LEARNING_RATE, NAME, ckpt_file)
+  return  Network(data, LSTM_SIZE, NUM_LAYERS, LEARNING_RATE, OPT_DECAY, OPT_MOMENTUM, OPT_EPSILON, OPT_FORGET_BIAS, OPT_STDDEV, NAME, ckpt_file)
 
 def train():
   network = prepare_network();
